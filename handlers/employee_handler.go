@@ -1,92 +1,114 @@
 package handlers
 
 import (
-	"employee-api/database"
 	"employee-api/models"
+	"employee-api/services"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 )
 
-func GetEmployees(c *gin.Context) {
-	var employees []models.Employee
-
-	database.DB.Find(&employees)
-
-	c.JSON(http.StatusOK, employees)
+type EmployeeHandler struct {
+	service *services.EmployeeService
 }
 
-func CreateEmployee(c *gin.Context) {
+func NewEmployeeHandler(
+	service *services.EmployeeService,
+) *EmployeeHandler {
+
+	return &EmployeeHandler{
+		service: service,
+	}
+}
+
+func (h *EmployeeHandler) Create(c *gin.Context) {
+
 	var employee models.Employee
 
 	if err := c.ShouldBindJSON(&employee); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
+		c.JSON(400, gin.H{
 			"error": err.Error(),
 		})
 		return
 	}
 
-	database.DB.Create(&employee)
+	h.service.Create(&employee)
 
 	c.JSON(http.StatusCreated, employee)
 }
 
-func UpdateEmployee(c *gin.Context) {
-	var employee models.Employee
+func (h *EmployeeHandler) GetAll(c *gin.Context) {
 
-	id := c.Param("id")
+	employees, err := h.service.GetAll()
 
-	if err := database.DB.First(&employee, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"error": "Employee not found",
-		})
-		return
-	}
-
-	var input map[string]interface{}
-
-	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
+	if err != nil {
+		c.JSON(500, gin.H{
 			"error": err.Error(),
 		})
 		return
 	}
 
-	database.DB.Model(&employee).Updates(input)
-
-	c.JSON(http.StatusOK, employee)
+	c.JSON(200, employees)
 }
 
-func DeleteEmployee(c *gin.Context) {
-	var employee models.Employee
+func (h *EmployeeHandler) GetByID(c *gin.Context) {
 
 	id := c.Param("id")
 
-	if err := database.DB.First(&employee, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
+	employee, err := h.service.GetByID(id)
+
+	if err != nil {
+		c.JSON(404, gin.H{
 			"error": "Employee not found",
 		})
 		return
 	}
 
-	database.DB.Delete(&employee)
+	c.JSON(200, employee)
+}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Employee deleted successfully",
+func (h *EmployeeHandler) Update(c *gin.Context) {
+
+	id := c.Param("id")
+
+	var data map[string]interface{}
+
+	if err := c.ShouldBindJSON(&data); err != nil {
+		c.JSON(400, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	employee, err := h.service.Update(
+		id,
+		data,
+	)
+
+	if err != nil {
+		c.JSON(404, gin.H{
+			"error": "Employee not found",
+		})
+		return
+	}
+
+	c.JSON(200, employee)
+}
+
+func (h *EmployeeHandler) Delete(c *gin.Context) {
+
+	id := c.Param("id")
+
+	err := h.service.Delete(id)
+
+	if err != nil {
+		c.JSON(404, gin.H{
+			"error": "Employee not found",
+		})
+		return
+	}
+
+	c.JSON(200, gin.H{
+		"message": "Deleted successfully",
 	})
-}
-
-func GetEmployee(c *gin.Context) {
-	var employee models.Employee
-
-	id := c.Param("id")
-
-	if err := database.DB.First(&employee, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"error": "Employee not found",
-		})
-		return
-	}
-
-	c.JSON(http.StatusOK, employee)
 }
